@@ -160,7 +160,7 @@ Podemos aplicar transformaciones a los mensajes que llegan desde MQ, para darles
 ![image](https://github.com/user-attachments/assets/3e13e20d-edf6-4aee-b8e0-e78c28b6ff21)
 ![image](https://github.com/user-attachments/assets/79b6d9dd-b1bf-44e3-8175-18f34634a743)
 
-3. Bajo _spec:_, agregar el siguiente código utilizado para aplanar el mensaje JSON y guardar los cambios.
+3. Bajo _spec.config_, agregar el siguiente código utilizado para aplanar el mensaje JSON y guardar los cambios.
 
 
 ```yaml
@@ -224,7 +224,7 @@ transforms.flatten.delimiter: _
 
 El mensaje ya está listo para ser consumido por la aplicación que lee los mensajes desde Kafka. Vamos a ver algunas transformaciones adicionales que podemos hacer.
 
-5. Volvemos a nuestro conector y eliminamos la líneas que agregamos en el paso anterior: _transforms_, _transforms.flatten.type_ y _transforms.flatten.delimiter_. Agregamos las nuevas transformaciones en el nivel de _spec_.
+5. Volvemos a nuestro conector y eliminamos la líneas que agregamos en el paso anterior: _transforms_, _transforms.flatten.type_ y _transforms.flatten.delimiter_. Agregamos las nuevas transformaciones en el nivel de _spec.config_.
 
 ```yaml
 transforms: flatten, redact, drop, origin, casts
