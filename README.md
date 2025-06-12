@@ -35,7 +35,7 @@ studentXX-Password
 ![image](https://github.com/user-attachments/assets/37b1b6ba-8cdc-4e41-bb57-537d8922a613)
 ![image](https://github.com/user-attachments/assets/07dd2e7a-3d1e-473a-a910-796dabdc1636)
 
-5. En _STUDENTXX_, configurar a _STUDENTXX.COPY_ como su Streaming Queue y guardar los cambios.
+5. En _STUDENTXX_, indicar a _STUDENTXX.COPY_ como su Streaming Queue y guardar los cambios.
 ![image](https://github.com/user-attachments/assets/30926cc0-8dcd-4056-bd0f-8637d6725cf3)
 ![image](https://github.com/user-attachments/assets/de0187d2-65ee-4b72-bdef-9bba8d220782)
 ![image](https://github.com/user-attachments/assets/706f96f9-5a45-410c-b2b6-7f12d430fec4)
@@ -113,5 +113,122 @@ spec:
     value.converter.schemas.enable: false
 ```
 
-99. Ir a **Operators -> Installed Operators** y seleccionar el operador de Event Streams.
+3. Ir a **Operators -> Installed Operators** y seleccionar el operador de Event Streams. En la pestaña **Kafka Connector**, verificar que el Status del conector sea **Ready**.
 ![image](https://github.com/user-attachments/assets/40b7efe1-f6a3-4c40-bd15-01d7da6ec513)
+![image](https://github.com/user-attachments/assets/3e13e20d-edf6-4aee-b8e0-e78c28b6ff21)
+
+Ya tenemos todo configurado para empezar a enviar mensajes a MQ y recibirlos también en Event Streams.
+
+### Envío de mensajes
+
+El siguiente paso es verificar que los mensajes de MQ aparezcan en el tópico de Kafka como flujo de eventos.
+
+1. Comprobamos que el tópico _MQ.STUDENTXX_ está vacío.
+![image](https://github.com/user-attachments/assets/60121e7a-3b4c-4abe-8433-0b94b9286f48)
+
+2. Desde la consola de MQ, enviamos el siguiente mensaje a la queue original _STUDENTXX_:
+```json
+{
+  "transaction_id": "a1b2c3d4-e5f6-7890-abcd-1234567890ef",
+  "customer": {
+    "id": "98f7a6b5-c4d3-2e1f-0a9b-87654321fedc",
+    "name": "Tomás Herrera"
+  },
+  "account": {
+    "number": "123456789012",
+    "type": "Cuenta Corriente",
+    "balance": 12500.75
+  },
+  "debitcard": {
+    "number": "4567123412341234",
+    "expiry": "11/26"
+  },
+  "transaction": {
+    "type": "Transferencia",
+    "amount": "700000",
+    "currency": "ARS",
+    "description": "Pago alquiler junio"
+  },
+  "transaction_time": "2025-06-06 14:32:47.583"
+}
+```
+![image](https://github.com/user-attachments/assets/e0be621f-e25f-415f-9680-798952e23f28)
+
+3. Confirmamos que el mensaje está disponible en el tópico _MQ.STUDENTXX_ de Event Streams.
+![image](https://github.com/user-attachments/assets/ea3f9c10-50c0-4b66-8fee-1febf5409e1d)
+
+4. También podemos ver que sigue estando disponible en la cola de MQ.
+![image](https://github.com/user-attachments/assets/0c1378c4-27fe-4d51-a26f-c87d871bc375)
+
+### Transformación de mensajes
+
+Podemos aplicar transformaciones a los mensajes que llegan desde MQ, para darles el formato requerido por la aplicación consumidora, para ofuscar datos sensibles y más. Para esto, tenemos que modificar el Kafka Connector que en los pasos anteriores.
+
+1. Volver a la consola de OpenShift: https://console-openshift-console.apps.itz-nxsqr6.hub01-lb.techzone.ibm.com/
+  
+2. Ir a **Operators -> Installed Operators** y buscar el operador de Event Streams. En la pestaña **Kafka Connector**, ingresar a _studentxx-mq-to-es-connector_ y abrir la pestaña **YAML**.
+![image](https://github.com/user-attachments/assets/3e13e20d-edf6-4aee-b8e0-e78c28b6ff21)
+![image](https://github.com/user-attachments/assets/79b6d9dd-b1bf-44e3-8175-18f34634a743)
+
+3. Bajo _spec:_, agregar el siguiente código utilizado para aplanar el mensaje JSON y guardar los cambios.
+**Nota:** si nos dice que existe una nueva versión del objeto, click en **Reload**, volver a agregar las transformaciones y guardar.
+
+```yaml
+transforms: flatten
+
+transforms.flatten.type: org.apache.kafka.connect.transforms.Flatten$Value
+transforms.flatten.delimiter: _
+```
+
+4. Enviar un nuevo mensaje a la cola de MQ y ver las transformaciones en Event Streams. El mensaje fue aplanado y ya no contiene estructuras con diferentes niveles.
+**Nota:** los cambios pueden tardar un momento en aplicarse. Si al enviar el mensaje vemos que no fue transformado, esperar 30 segundos y reenviarlo.
+
+```json
+{
+  "transaction_id": "f3e2d1c0-b9a8-4567-8901-abcdef123456",
+  "customer": {
+    "id": "ab12cd34-ef56-7890-ab12-cd34ef567890",
+    "name": "Lucía Benítez"
+  },
+  "account": {
+    "number": "987654321098",
+    "type": "Caja de Ahorro",
+    "balance": 84200.50
+  },
+  "debitcard": {
+    "number": "5123987654321098",
+    "expiry": "08/27"
+  },
+  "transaction": {
+    "type": "Pago",
+    "amount": "125000",
+    "currency": "ARS",
+    "description": "Compra electrodomésticos"
+  },
+  "transaction_time": "2025-06-07 09:18:22.417"
+}
+```
+
+![image](https://github.com/user-attachments/assets/22d5ecbf-aac5-4a21-8d69-07de9edc6672)
+
+```json
+{
+  "transaction_id": "f3e2d1c0-b9a8-4567-8901-abcdef123456",
+  "transaction_time": "2025-06-07 09:18:22.417",
+  "account_number": "987654321098",
+  "account_balance": 84200.5,
+  "account_type": "Caja de Ahorro",
+  "debitcard_number": "5123987654321098",
+  "debitcard_expiry": "08/27",
+  "transaction_amount": "125000",
+  "transaction_description": "Compra electrodomésticos",
+  "transaction_currency": "ARS",
+  "transaction_type": "Pago",
+  "customer_name": "Lucía Benítez",
+  "customer_id": "ab12cd34-ef56-7890-ab12-cd34ef567890"
+}
+```
+
+El mensaje ya está listo para ser consumido por la aplicación que lee los mensajes desde Kafka. Vamos a ver algunas transformaciones adicionales que podemos hacer.
+
+5. 
