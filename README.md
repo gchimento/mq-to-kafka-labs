@@ -14,16 +14,6 @@ Password:
 studentXX-Password
 ```
 
-| Nº | Nombre         |
-|----|----------------|
-| 1  | Juan Pérez     |
-| 2  | María Gómez    |
-| 3  | Lucas Fernández|
-| 4  | Ana Torres     |
-| 5  | Diego Ramírez  |
-| 6  | Sofía Méndez   |
-| 7  | Martín Rivas   |
-
 2. Abrir consola de MQ
 ![image](https://github.com/user-attachments/assets/75dfc10a-2ae4-4778-95c4-5712dba4bbf3)
 
@@ -171,7 +161,7 @@ Podemos aplicar transformaciones a los mensajes que llegan desde MQ, para darles
 ![image](https://github.com/user-attachments/assets/79b6d9dd-b1bf-44e3-8175-18f34634a743)
 
 3. Bajo _spec:_, agregar el siguiente código utilizado para aplanar el mensaje JSON y guardar los cambios.
-**Nota:** si nos dice que existe una nueva versión del objeto, click en **Reload**, volver a agregar las transformaciones y guardar.
+
 
 ```yaml
 transforms: flatten
@@ -180,7 +170,10 @@ transforms.flatten.type: org.apache.kafka.connect.transforms.Flatten$Value
 transforms.flatten.delimiter: _
 ```
 
-4. Enviar un nuevo mensaje a la cola de MQ y ver las transformaciones en Event Streams. El mensaje fue aplanado y ya no contiene estructuras con diferentes niveles.
+**Nota:** si nos dice que el objeto fue modificado, click en **Reload**, volver a agregar las transformaciones y guardar.
+![image](https://github.com/user-attachments/assets/93c2461a-aed2-4f47-9b48-b26f36ca3609)
+
+4. Enviar un nuevo mensaje a la cola de MQ y ver las transformaciones en Event Streams. El mensaje fue aplanado y ya no contiene estructuras anidadas.
 **Nota:** los cambios pueden tardar un momento en aplicarse. Si al enviar el mensaje vemos que no fue transformado, esperar 30 segundos y reenviarlo.
 
 ```json
@@ -231,4 +224,82 @@ transforms.flatten.delimiter: _
 
 El mensaje ya está listo para ser consumido por la aplicación que lee los mensajes desde Kafka. Vamos a ver algunas transformaciones adicionales que podemos hacer.
 
-5. 
+5. Volvemos a nuestro conector y eliminamos la líneas que agregamos en el paso anterior: _transforms_, _transforms.flatten.type_ y _transforms.flatten.delimiter_. Agregamos las nuevas transformaciones en el nivel de _spec_.
+
+```yaml
+transforms: flatten, redact, drop, origin, casts
+
+transforms.flatten.type: org.apache.kafka.connect.transforms.Flatten$Value
+transforms.flatten.delimiter: _
+
+transforms.redact.type: org.apache.kafka.connect.transforms.MaskField$Value
+transforms.redact.fields: debitcard_number
+transforms.redact.replacement: XXXXXXXXXXXXXXXX
+
+transforms.drop.type: org.apache.kafka.connect.transforms.ReplaceField$Value
+transforms.drop.blacklist: customer_name
+
+transforms.origin.type: org.apache.kafka.connect.transforms.InsertField$Value
+transforms.origin.static.field: origin
+transforms.origin.static.value: mq-connector
+
+transforms.casts.type: org.apache.kafka.connect.transforms.Cast$Value
+transforms.casts.spec: transaction_amount:int32
+```
+
+![image](https://github.com/user-attachments/assets/30f061d0-473e-4e81-825e-24d814f61279)
+
+6. Enviamos un nuevo mensaje a MQ y vemos el resultado:
+
+```json
+{
+  "transaction_id": "9c8b7a6d-5e4f-3210-ba98-76543210fedc",
+  "customer": {
+    "id": "cd34ef56-7890-ab12-cd34-ef5678901234",
+    "name": "Federico Álvarez"
+  },
+  "account": {
+    "number": "112233445566",
+    "type": "Cuenta Corriente",
+    "balance": 30500.00
+  },
+  "debitcard": {
+    "number": "4012888888881881",
+    "expiry": "03/28"
+  },
+  "transaction": {
+    "type": "Extracción",
+    "amount": "50000",
+    "currency": "ARS",
+    "description": "Retiro en cajero automático"
+  },
+  "transaction_time": "2025-06-08 17:45:11.209"
+}
+```
+
+![image](https://github.com/user-attachments/assets/3580c799-67b2-4fc5-a6a8-aa54e803c512)
+
+```json
+{
+  "transaction_id": "9c8b7a6d-5e4f-3210-ba98-76543210fedc",
+  "debitcard_number": "XXXXXXXXXXXXXXXX",
+  "account_number": "112233445566",
+  "account_type": "Cuenta Corriente",
+  "account_balance": 30500,
+  "transaction_amount": 50000,
+  "origin": "mq-connector",
+  "debitcard_expiry": "03/28",
+  "transaction_description": "Retiro en cajero automático",
+  "transaction_type": "Extracción",
+  "transaction_time": "2025-06-08 17:45:11.209",
+  "customer_id": "cd34ef56-7890-ab12-cd34-ef5678901234",
+  "transaction_currency": "ARS"
+}
+```
+
+Notamos que:
+- El conector insteró la propiedad propiedad _origin_ en el mensaje.
+- El campo _debitcard_number_ fue ofuscado con caracteres X, ocultando el número real de la tarjeta por razones de seguridad.
+- El campo _customer_name_ fue eliminado del mensaje para proteger la identidad del cliente.
+- El campo _transaction_amount_, originalmente un string, fue convertido a un entero para facilitar su procesamiento en sistemas posteriores.
+- Al igual que antes, la estructura del mensaje fue aplanada.
