@@ -1,5 +1,5 @@
 # MQ to Kafka labs: configurando Streaming Queues y Kafka Connect
-Lorem ipsum
+Las colas y tópicos de IBM MQ son una fuente valiosa de datos y eventos para procesar. En este ejercicio, vamos a ver cómo los mensajes de MQ pueden publicarse en tópicos de Kafka, desde donde se pueden usar como fuente de eventos para otras aplicaciones.
 
 ## Lab tasks
 ### Configurar Streaming Queues
